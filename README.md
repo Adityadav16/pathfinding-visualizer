@@ -44,7 +44,10 @@ This project helps students understand:
 - Heuristic Search
 - Algorithm Visualization
 
-## 📷 Screenshots
+## 📷 Screenshots<img width="1821" height="804" alt="Screenshot 2026-05-24 092804" src="https://github.com/user-attachments/assets/1aeb3508-0539-4617-9adc-c749d29e4176" />
+
+
+
 
 (Add screenshots here)
 
