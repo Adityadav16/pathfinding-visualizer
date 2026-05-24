@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pathfinding Visualizer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0A1628;
+      color: #E8EDF5;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #8899BB;
+      margin-bottom: 14px;
+      font-style: italic;
+    }
+
+    /* ── CONTROLS ── */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .algo-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    button {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 6px 14px;
+      border: 1px solid #1E3A5F;
+      border-radius: 6px;
+      background: transparent;
+      color: #E8EDF5;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover { background: #112240; }
+    button.active { background: #185FA5; color: #E6F1FB; border-color: #185FA5; }
+    button.run-btn { background: #0F6E56; color: #E1F5EE; border-color: #0F6E56; font-weight: 600; }
+    button.run-btn:hover { background: #085041; }
+    button.clear-btn { color: #8899BB; }
+    button.clear-btn:hover { background: #0F2044; }
+
+    .sep { width: 1px; height: 24px; background: #1E3A5F; }
+
+    .mode-badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #112240;
+      color: #8899BB;
+      border: 1px solid #1E3A5F;
+    }
+    .mode-badge span { color: #00C9C8; font-weight: 600; }
+
+    /* ── GRID ── */
+    .grid-wrapper {
+      border: 1px solid #1E3A5F;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #0A1628;
+      margin-bottom: 10px;
+      display: inline-block;
+      width: 100%;
+    }
+
+    #grid {
+      display: grid;
+      width: 100%;
+      cursor: crosshair;
+      user-select: none;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      border-right: 1px solid #1A2E50;
+      border-bottom: 1px solid #1A2E50;
+      transition: background 0.06s;
+    }
+    .cell.wall     { background: #1C1C2E; }
+    .cell.start    { background: #1DB954; }
+    .cell.end      { background: #F76C2F; }
+    .cell.visited  { background: #B5D4F4; }
+    .cell.path     { background: #F5C842; }
+    .cell.frontier { background: #9FE1CB; }
+
+    /* ── INFO BAR ── */
+    .info-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .stat-card {
+      flex: 1;
+      min-width: 120px;
+      background: #112240;
+      border: 1px solid #1E3A5F;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .stat-card .label { font-size: 11px; color: #8899BB; margin-bottom: 4px; }
+    .stat-card .value { font-size: 20px; font-weight: 700; color: #ffffff; }
+    .stat-card .sub   { font-size: 11px; color: #8899BB; margin-top: 2px; }
+
+    /* ── COMPLEXITY BOX ── */
+    .complexity-box {
+      background: #112240;
+      border: 1px solid #1E3A5F;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+    }
+    .complexity-box .title { font-size: 12px; font-weight: 600; color: #E8EDF5; margin-bottom: 6px; }
+    .complexity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; }
+    .complexity-row  { font-size: 12px; color: #8899BB; }
+    .complexity-row span { color: #E8EDF5; font-weight: 500; }
+
+    /* ── LEGEND ── */
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+    .leg { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #8899BB; }
+    .leg-box { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+    /* ── STATUS ── */
+    .status { font-size: 13px; color: #8899BB; min-height: 20px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+  <h1>Pathfinding Visualizer</h1>
+  <p class="subtitle">Draw walls · Set start/end · Pick algorithm · Click Run</p>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="algo-btns">
+      <button class="active" id="btn-bfs"      onclick="selectAlgo('bfs')">BFS</button>
+      <button              id="btn-dfs"        onclick="selectAlgo('dfs')">DFS</button>
+      <button              id="btn-dijkstra"   onclick="selectAlgo('dijkstra')">Dijkstra</button>
+      <button              id="btn-astar"      onclick="selectAlgo('astar')">A*</button>
+    </div>
+    <div class="sep"></div>
+    <button onclick="cycleMode()" id="mode-btn">Mode: <span id="mode-label">Wall</span></button>
+    <div class="sep"></div>
+    <button class="run-btn"   onclick="runAlgo()">▶ Run</button>
+    <button class="clear-btn" onclick="clearPath()">Clear Path</button>
+    <button class="clear-btn" onclick="resetGrid()">Reset Grid</button>
+  </div>
+
+  <div class="mode-badge">Drawing: <span id="current-mode">walls</span> — click or drag on grid</div>
+
+  <!-- Grid -->
+  <div style="margin-top:10px;">
+    <div class="grid-wrapper">
+      <div id="grid"></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="info-bar">
+    <div class="stat-card">
+      <div class="label">Cells Visited</div>
+      <div class="value" id="stat-visited">0</div>
+      <div class="sub">explored nodes</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Path Length</div>
+      <div class="value" id="stat-path">—</div>
+      <div class="sub">steps to goal</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Algorithm</div>
+      <div class="value" id="stat-algo" style="font-size:15px;margin-top:4px;">BFS</div>
+      <div class="sub" id="stat-algo-sub">breadth-first search</div>
+    </div>
+  </div>
+
+  <!-- Complexity -->
+  <div class="complexity-box">
+    <div class="title">Complexity Info</div>
+    <div class="complexity-grid" id="complexity-grid">
+      <div class="complexity-row">Time: <span>O(V + E)</span></div>
+      <div class="complexity-row">Space: <span>O(V)</span></div>
+      <div class="complexity-row">Optimal: <span>Yes (unweighted)</span></div>
+      <div class="complexity-row">Complete: <span>Yes</span></div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="leg"><div class="leg-box" style="background:#1DB954"></div>Start</div>
+    <div class="leg"><div class="leg-box" style="background:#F76C2F"></div>End</div>
+    <div class="leg"><div class="leg-box" style="background:#1C1C2E;border:1px solid #555"></div>Wall</div>
+    <div class="leg"><div class="leg-box" style="background:#9FE1CB"></div>Frontier</div>
+    <div class="leg"><div class="leg-box" style="background:#B5D4F4"></div>Visited</div>
+    <div class="leg"><div class="leg-box" style="background:#F5C842"></div>Shortest Path</div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script>
+    // ── CONFIG ────────────────────────────────────────────────────────────────
+    const ROWS = 18, COLS = 30;
+    let grid = [];
+    let startCell = null, endCell = null;
+    let mouseDown = false;
+    let algo = 'bfs';
+    let drawMode = 'wall';
+    let running = false;
+    const modes = ['wall', 'start', 'end'];
+    let modeIdx = 0;
+
+    // Complexity data for each algorithm
+    const complexities = {
+      bfs:      { time:'O(V + E)',       space:'O(V)', optimal:'Yes (unweighted)', complete:'Yes', name:'BFS',      full:'breadth-first search' },
+      dfs:      { time:'O(V + E)',       space:'O(V)', optimal:'No',               complete:'No (may loop)',  name:'DFS',      full:'depth-first search' },
+      dijkstra: { time:'O((V+E) log V)', space:'O(V)', optimal:'Yes',              complete:'Yes', name:'Dijkstra', full:"dijkstra's algorithm" },
+      astar:    { time:'O(E log V)',     space:'O(V)', optimal:'Yes (admissible h)',complete:'Yes', name:'A*',       full:'a* search algorithm' }
+    };
+
+    // ── BUILD GRID ────────────────────────────────────────────────────────────
+    function initGrid() {
+      const g = document.getElementById('grid');
+      g.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+      g.innerHTML = '';
+      grid = [];
+
+      for (let r = 0; r < ROWS; r++) {
+        grid[r] = [];
+        for (let c = 0; c < COLS; c++) {
+          const el = document.createElement('div');
+          el.className = 'cell';
+          el.dataset.r = r;
+          el.dataset.c = c;
+          el.addEventListener('mousedown', e => { mouseDown = true; handleCell(r, c); e.preventDefault(); });
+          el.addEventListener('mouseover', () => { if (mouseDown) handleCell(r, c); });
+          g.appendChild(el);
+          grid[r][c] = { el, wall: false, state: '' };
+        }
+      }
+
+      setStart(3, 3);
+      setEnd(3, COLS - 4);
+    }
+
+    function setStart(r, c) {
+      if (startCell) { startCell.el.className = 'cell'; startCell.state = ''; }
+      startCell = grid[r][c];
+      startCell.el.className = 'cell start';
+      startCell.state = 'start';
+    }
+
+    function setEnd(r, c) {
+      if (endCell) { endCell.el.className = 'cell'; endCell.state = ''; }
+      endCell = grid[r][c];
+      endCell.el.className = 'cell end';
+      endCell.state = 'end';
+    }
+
+    function handleCell(r, c) {
+      if (running) return;
+      const cell = grid[r][c];
+      if (drawMode === 'wall') {
+        if (cell === startCell || cell === endCell) return;
+        cell.wall = !cell.wall;
+        cell.el.className = 'cell' + (cell.wall ? ' wall' : '');
+        cell.state = cell.wall ? 'wall' : '';
+      } else if (drawMode === 'start') {
+        if (cell === endCell) return;
+        setStart(r, c);
+      } else if (drawMode === 'end') {
+        if (cell === startCell) return;
+        setEnd(r, c);
+      }
+    }
+
+    document.addEventListener('mouseup', () => mouseDown = false);
+
+    // ── MODE TOGGLE ───────────────────────────────────────────────────────────
+    function cycleMode() {
+      modeIdx = (modeIdx + 1) % 3;
+      drawMode = modes[modeIdx];
+      document.getElementById('current-mode').textContent =
+        drawMode === 'wall' ? 'walls' : drawMode + ' point';
+      document.getElementById('mode-label').textContent =
+        drawMode.charAt(0).toUpperCase() + drawMode.slice(1);
+    }
+
+    // ── ALGORITHM SELECT ──────────────────────────────────────────────────────
+    function selectAlgo(a) {
+      algo = a;
+      ['bfs','dfs','dijkstra','astar'].forEach(x =>
+        document.getElementById('btn-' + x).classList.remove('active'));
+      document.getElementById('btn-' + a).classList.add('active');
+
+      const c = complexities[a];
+      document.getElementById('stat-algo').textContent = c.name;
+      document.getElementById('stat-algo-sub').textContent = c.full;
+      document.getElementById('complexity-grid').innerHTML =
+        `<div class="complexity-row">Time: <span>${c.time}</span></div>
+         <div class="complexity-row">Space: <span>${c.space}</span></div>
+         <div class="complexity-row">Optimal: <span>${c.optimal}</span></div>
+         <div class="complexity-row">Complete: <span>${c.complete}</span></div>`;
+      clearPath();
+    }
+
+    // ── CLEAR / RESET ─────────────────────────────────────────────────────────
+    function clearPath() {
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = grid[r][c];
+          if (cell.state === 'visited' || cell.state === 'path' || cell.state === 'frontier') {
+            cell.state = '';
+            cell.el.className = 'cell';
+          }
+        }
+      }
+      document.getElementById('stat-visited').textContent = '0';
+      document.getElementById('stat-path').textContent = '—';
+      document.getElementById('status').textContent = '';
+    }
+
+    function resetGrid() {
+      running = false;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = grid[r][c];
+          cell.wall = false;
+          cell.state = '';
+          cell.el.className = 'cell';
+        }
+      }
+      setStart(3, 3);
+      setEnd(3, COLS - 4);
+      clearPath();
+    }
+
+    // ── NEIGHBORS ─────────────────────────────────────────────────────────────
+    function neighbors(r, c) {
+      const res = [];
+      [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && !grid[nr][nc].wall)
+          res.push([nr, nc]);
+      });
+      return res;
+    }
+
+    function key(r, c) { return r + ',' + c; }
+
+    // ── MANHATTAN HEURISTIC (for A*) ──────────────────────────────────────────
+    function heuristic(r, c) {
+      const er = +endCell.el.dataset.r;
+      const ec = +endCell.el.dataset.c;
+      return Math.abs(r - er) + Math.abs(c - ec);
+    }
+
+    // ── RUN ALGORITHM ─────────────────────────────────────────────────────────
+    function runAlgo() {
+      if (running) return;
+      clearPath();
+      running = true;
+
+      const sr = +startCell.el.dataset.r, sc = +startCell.el.dataset.c;
+      const er = +endCell.el.dataset.r,   ec = +endCell.el.dataset.c;
+      const prev = {};
+      let steps = [], found = false;
+
+      // ── BFS ────────────────────────────────────────────────────────────────
+      if (algo === 'bfs') {
+        const queue = [[sr, sc]];
+        const visited = new Set([key(sr, sc)]);
+        while (queue.length && !found) {
+          const [r, c] = queue.shift();            // FIFO
+          steps.push({ r, c, type: 'visited' });
+          if (r === er && c === ec) { found = true; break; }
+          for (const [nr, nc] of neighbors(r, c)) {
+            if (!visited.has(key(nr, nc))) {
+              visited.add(key(nr, nc));
+              prev[key(nr, nc)] = [r, c];
+              queue.push([nr, nc]);
+              steps.push({ r: nr, c: nc, type: 'frontier' });
+            }
+          }
+        }
+
+      // ── DFS ────────────────────────────────────────────────────────────────
+      } else if (algo === 'dfs') {
+        const stack = [[sr, sc]];
+        const visited = new Set([key(sr, sc)]);
+        while (stack.length && !found) {
+          const [r, c] = stack.pop();              // LIFO
+          steps.push({ r, c, type: 'visited' });
+          if (r === er && c === ec) { found = true; break; }
+          for (const [nr, nc] of neighbors(r, c)) {
+            if (!visited.has(key(nr, nc))) {
+              visited.add(key(nr, nc));
+              prev[key(nr, nc)] = [r, c];
+              stack.push([nr, nc]);
+              steps.push({ r: nr, c: nc, type: 'frontier' });
+            }
+          }
+        }
+
+      // ── DIJKSTRA ───────────────────────────────────────────────────────────
+      } else if (algo === 'dijkstra') {
+        const dist = { [key(sr, sc)]: 0 };
+        const pq = [[0, sr, sc]];
+        const visited = new Set();
+        while (pq.length && !found) {
+          pq.sort((a, b) => a[0] - b[0]);         // min-heap by distance
+          const [d, r, c] = pq.shift();
+          if (visited.has(key(r, c))) continue;
+          visited.add(key(r, c));
+          steps.push({ r, c, type: 'visited' });
+          if (r === er && c === ec) { found = true; break; }
+          for (const [nr, nc] of neighbors(r, c)) {
+            const nd = d + 1;
+            if (dist[key(nr, nc)] === undefined || nd < dist[key(nr, nc)]) {
+              dist[key(nr, nc)] = nd;
+              prev[key(nr, nc)] = [r, c];
+              pq.push([nd, nr, nc]);
+              steps.push({ r: nr, c: nc, type: 'frontier' });
+            }
+          }
+        }
+
+      // ── A* ─────────────────────────────────────────────────────────────────
+      } else if (algo === 'astar') {
+        const g = { [key(sr, sc)]: 0 };
+        const pq = [[heuristic(sr, sc), sr, sc]];
+        const visited = new Set();
+        while (pq.length && !found) {
+          pq.sort((a, b) => a[0] - b[0]);         // min-heap by f = g + h
+          const [, r, c] = pq.shift();
+          if (visited.has(key(r, c))) continue;
+          visited.add(key(r, c));
+          steps.push({ r, c, type: 'visited' });
+          if (r === er && c === ec) { found = true; break; }
+          for (const [nr, nc] of neighbors(r, c)) {
+            const ng = g[key(r, c)] + 1;
+            if (g[key(nr, nc)] === undefined || ng < g[key(nr, nc)]) {
+              g[key(nr, nc)] = ng;
+              prev[key(nr, nc)] = [r, c];
+              const f = ng + heuristic(nr, nc);   // f(n) = g(n) + h(n)
+              pq.push([f, nr, nc]);
+              steps.push({ r: nr, c: nc, type: 'frontier' });
+            }
+          }
+        }
+      }
+
+      // ── RECONSTRUCT PATH ──────────────────────────────────────────────────
+      const path = [];
+      if (found) {
+        let cur = [er, ec];
+        while (key(cur[0], cur[1]) !== key(sr, sc)) {
+          path.unshift(cur);
+          cur = prev[key(cur[0], cur[1])];
+          if (!cur) break;
+        }
+      }
+
+      animate(steps, path);
+    }
+
+    // ── ANIMATION ─────────────────────────────────────────────────────────────
+    function animate(steps, path) {
+      let i = 0, visitedCount = 0;
+
+      function tick() {
+        if (i < steps.length) {
+          const s = steps[i];
+          const cell = grid[s.r][s.c];
+          if (cell !== startCell && cell !== endCell) {
+            if (s.type === 'visited') {
+              cell.state = 'visited';
+              cell.el.className = 'cell visited';
+              visitedCount++;
+            } else if (s.type === 'frontier' && cell.state !== 'visited') {
+              cell.state = 'frontier';
+              cell.el.className = 'cell frontier';
+            }
+          }
+          document.getElementById('stat-visited').textContent = visitedCount;
+          i++;
+          setTimeout(tick, 18);
+        } else {
+          // Draw path
+          if (path.length) {
+            let pi = 0;
+            function drawPath() {
+              if (pi < path.length) {
+                const [r, c] = path[pi];
+                const cell = grid[r][c];
+                if (cell !== startCell && cell !== endCell) {
+                  cell.state = 'path';
+                  cell.el.className = 'cell path';
+                }
+                pi++;
+                setTimeout(drawPath, 40);
+              } else {
+                document.getElementById('stat-path').textContent = path.length;
+                document.getElementById('status').textContent =
+                  `✓ Path found: ${path.length} steps · ${visitedCount} cells explored.`;
+                running = false;
+              }
+            }
+            drawPath();
+          } else {
+            document.getElementById('status').textContent =
+              '✗ No path found — try removing some walls.';
+            document.getElementById('stat-path').textContent = '—';
+            running = false;
+          }
+        }
+      }
+
+      tick();
+    }
+
+    // ── INIT ──────────────────────────────────────────────────────────────────
+    initGrid();
+  </script>
+</body>
+</html>
